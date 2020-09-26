@@ -11,29 +11,30 @@ config = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=NUM_THREADS)
 config.gpu_options.allow_growth = True
 tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=config))
 
-maxP2P = 8.0+ 0.000001 ##, 9.0  # the .asg file has p2p pairwise distance threshold of 9.0A
+maxP2P = 8.0+ 0.000001 # the p2p pairwise distance threshold
 
-# 21 for maxP2p=7.0A; 27 for maxP2p=8.0A; 30 for maxP2p=9.0A:
-# the maximum number of p2p distances in all the procssed PDBs
-noOfp2pPoint_max = 27 
-p2p_list = [0.0]*(noOfp2pPoint_max+2)
-seq_list = [0.0]*noOfp2pPoint_max
+# 21 for $maxP2P=7.0$A; 27 for $maxP2P=8.0$A; 30 for $maxP2P=9.0$A:
+noOfp2pPoint_max = 27 # the maximum number of p2p distances in all the procssed PDBs
+
+# $p2p_list$ has two more elements than seq_list.
+# they are the p2p distance of (i, i+1) and the p2p distance of (i-1, i)
+p2p_list = [0.0] * (noOfp2pPoint_max+2) 
+seq_list = [0.0] * noOfp2pPoint_max
 
 noOfAngle = 5 # 5 angles 
-startingAngleIndexFromEnd = noOfAngle # 5 angles 
-angle_list=[1.0] * noOfAngle
+startingAngleIndexFromTheEnd = noOfAngle # 5 angles 
+angle_list = [1.0] * noOfAngle
 
 deg2Radius = math.pi / 180.0
 
 p2pTokenIndex = 2 # the starting index for p2p distance/index sequence is 2 
-rowData = [] # * noOfColumn = 65
+minNoOfToken = 7  # 2 tokens before the p2p distance/index statement, plus 5 angles at the end
 
-minNoOfToken = 7  # 2 tokens before the p2p distance/index statement, plus 5 (angles)
 angleTokenIndex = 0 #
 asgTokenIndex = 0
-
 noOfp2pPoint = 0
 noOfToken = 0
+
 minProb = 0.001
 
 p2p = 0.0
@@ -43,7 +44,7 @@ def asgReader(fileName):
     sFile = open(fileName, 'r')
     content = sFile.readlines()
     noOfLine = len(content)
-    noOfResidue = noOfLine - 2; ## since there are 2 extra lines in the asg file
+    noOfResidue = noOfLine; ## since there are 2 extra lines in the asg file
     
     p2pList = []
     seqList = []
@@ -58,7 +59,7 @@ def asgReader(fileName):
         tokens = txtLine.split() ##
         noOfToken = len(tokens)
         
-        if  noOfToken > minNoOfToken and tokens[0].strip() != 'Agreement:':
+        if  noOfToken > minNoOfToken:
             noOfp2pPoint = int((noOfToken - minNoOfToken) / 2)
 
             residID.append(tokens[0])
@@ -84,8 +85,7 @@ def asgReader(fileName):
                    p2p_list[i+2] = 0.0
                    seq_list[i] =   0.0
 
-            angleTokenIndex = noOfToken - startingAngleIndexFromEnd  #
-            asgTokenIndex = noOfToken - 2         #should leave out if NO assignment
+            angleTokenIndex = noOfToken - startingAngleIndexFromTheEnd  #
             for i in range(noOfAngle):
                 angle_list[i]= deg2Radius * float(tokens[angleTokenIndex + i].strip())
                 
@@ -229,12 +229,12 @@ def assignSSE(model, residID, p2pDat, asgFile):
 
     ## output the SSE content
     asgFile.write('-----\n')
-    asgFile.write("{0} {1:4d} \n".format('H:', p2pH))
-    asgFile.write("{0} {1:4d} \n".format('G:', p2pG))
-    asgFile.write("{0} {1:4d} \n".format('E:', p2pE))
-    asgFile.write("{0} {1:4d} \n".format('B:', p2pB))
-    asgFile.write("{0} {1:4d} \n".format('T:', p2pT))
-    asgFile.write("{0} {1:4d} \n".format('U:', p2pU))
+    asgFile.write("{0} {1:4d} \n".format('H: ', p2pH))
+    asgFile.write("{0} {1:4d} \n".format('G: ', p2pG))
+    asgFile.write("{0} {1:4d} \n".format('E: ', p2pE))
+    asgFile.write("{0} {1:4d} \n".format('B: ', p2pB))
+    asgFile.write("{0} {1:4d} \n".format('T: ', p2pT))
+    asgFile.write("{0} {1:4d} \n".format('U: ', p2pU))
     asgFile.write("{0} {1:5d} \n".format('No of Residues:', p2pH + p2pG + p2pE + p2pB + p2pT + p2pU ))     
 
 if __name__=="__main__":
@@ -251,15 +251,15 @@ if __name__=="__main__":
     p2pBt = 0
 
     total = len(sys.argv)
-#    if total > 1:
-#        fileName = sys.argv[1].strip() #
-    for fileName in glob.glob("*.asg"):
+    if total > 1:
+        fileName = sys.argv[1].strip()        
+#    for fileName in glob.glob("*.dat"):
         residID, p2pData = asgReader(fileName)
-        asgFile = open(fileName[:-4]+'.lbl',"w+")
+        asgFile = open(fileName[:-4]+'.asg',"w+")
         assignSSE(model, residID, p2pData, asgFile)
         asgFile.close()
-#    else:
-#        print("\nPlease specify an input\n")
+    else:
+        print("\nPlease specify an input\n")
 
 
 
